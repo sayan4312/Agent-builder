@@ -1,0 +1,214 @@
+import os
+import ast
+import json
+import time
+import concurrent.futures
+from typing import Any, Dict, List, Optional
+
+import requests
+from google import genai
+
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+
+gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+
+def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] = None) -> str:
+    if not gemini_client:
+        raise RuntimeError("Gemini API key not configured")
+
+    model_list = models or ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    last_err = None
+
+    for model_name in model_list:
+        try:
+            kwargs: Dict[str, Any] = {"model": model_name, "contents": contents}
+            if config is not None:
+                kwargs["config"] = config
+            response = gemini_client.models.generate_content(**kwargs)
+            return (response.text or "").strip()
+        except Exception as exc:
+            last_err = exc
+            err_str = str(exc)
+            if any(k in err_str for k in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "500", "504", "OVERLOADED"]):
+                print(f"[INFO] Gemini model {model_name} rate-limited/busy ({err_str[:60]}...), trying fallback model...")
+                time.sleep(1.5)
+                continue
+            if any(k in err_str for k in ["404", "NOT_FOUND"]):
+                print(f"[INFO] Gemini model {model_name} not found, trying fallback...")
+                continue
+            raise
+
+    if last_err:
+        raise last_err
+    raise RuntimeError("All Gemini model fallbacks failed")
+
+
+def _call_openrouter(contents: str, model: str = "openai/gpt-4o-mini", response_format: Optional[Dict[str, Any]] = None) -> str:
+    if not OPENROUTER_API_KEY:
+        raise RuntimeError("OpenRouter API key not configured")
+
+    payload: Dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": contents}
+        ],
+        "temperature": 0.2,
+    }
+
+    if response_format:
+        payload["response_format"] = response_format
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:3000"),
+            "X-Title": os.getenv("OPENROUTER_APP_NAME", "AgentForge"),
+        },
+        json=payload,
+        timeout=60,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data["choices"][0]["message"]["content"].strip()
+
+
+def _normalize_text(text: str) -> str:
+    return (text or "").strip().replace("```python", "").replace("```", "")
+
+
+def _is_json_text(text: str) -> bool:
+    try:
+        json.loads(_normalize_text(text))
+        return True
+    except Exception:
+        return False
+
+
+def _is_valid_python(text: str) -> bool:
+    try:
+        ast.parse(_normalize_text(text))
+        return True
+    except Exception:
+        return False
+
+
+def _score_candidate(text: str, mode: str = "code") -> int:
+    normalized = _normalize_text(text)
+    score = len(normalized)
+
+    if not normalized:
+        return -1000
+
+    if mode == "json":
+        if _is_json_text(normalized):
+            score += 2000
+        if normalized.startswith("{") and normalized.endswith("}"):
+            score += 200
+        if "```" in text:
+            score -= 300
+        return score
+
+    if mode == "general":
+        if "```" in text:
+            score -= 500
+        if len(normalized.split()) > 40:
+            score += 150
+        if normalized.count(".") >= 2:
+            score += 100
+        if normalized.count("\n") >= 2:
+            score += 50
+        if _is_valid_python(normalized):
+            score -= 300
+        return score
+
+    if _is_valid_python(normalized):
+        score += 2000
+    if "if __name__ == \"__main__\"" in normalized:
+        score += 200
+    if "import " in normalized:
+        score += 100
+    if "```" in text:
+        score -= 500
+    if "pass" in normalized and len(normalized) < 200:
+        score -= 100
+    return score
+
+
+def _choose_best_candidate(candidates: List[str], mode: str = "code") -> str:
+    valid_candidates = [candidate for candidate in candidates if candidate and candidate.strip()]
+    if not valid_candidates:
+        return ""
+    if mode == "json":
+        for candidate in valid_candidates:
+            if _is_json_text(candidate):
+                return _normalize_text(candidate)
+    else:
+        for candidate in valid_candidates:
+            if _is_valid_python(candidate):
+                return _normalize_text(candidate)
+
+    scored = sorted(valid_candidates, key=lambda item: _score_candidate(item, mode=mode), reverse=True)
+    return _normalize_text(scored[0])
+
+
+def generate_text_with_fallback(
+    contents: str,
+    config: Any = None,
+    response_format: Optional[Dict[str, Any]] = None,
+    openrouter_model: str = "openai/gpt-4o-mini",
+) -> str:
+    """Generate text with Gemini first, then OpenRouter as a fallback."""
+    try:
+        return _call_gemini(contents, config=config)
+    except Exception as gemini_error:
+        print(f"[WARN] Gemini failed, using OpenRouter fallback: {gemini_error}")
+
+    try:
+        return _call_openrouter(contents, model=openrouter_model, response_format=response_format)
+    except Exception as openrouter_error:
+        raise RuntimeError(f"Both Gemini and OpenRouter failed: {openrouter_error}") from openrouter_error
+
+
+def generate_text_pro(
+    contents: str,
+    config: Any = None,
+    response_format: Optional[Dict[str, Any]] = None,
+    openrouter_model: str = "openai/gpt-4o-mini",
+    mode: str = "code",
+) -> str:
+    """Generate with both Gemini and OpenRouter, then select the strongest output."""
+
+    def call_gemini() -> str:
+        try:
+            return _call_gemini(contents, config=config)
+        except Exception as exc:
+            print(f"[WARN] Gemini pro candidate failed: {exc}")
+            return ""
+
+    def call_openrouter() -> str:
+        try:
+            return _call_openrouter(contents, model=openrouter_model, response_format=response_format)
+        except Exception as exc:
+            print(f"[WARN] OpenRouter pro candidate failed: {exc}")
+            return ""
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        gemini_future = executor.submit(call_gemini)
+        openrouter_future = executor.submit(call_openrouter)
+        gemini_text = gemini_future.result()
+        openrouter_text = openrouter_future.result()
+
+    chosen = _choose_best_candidate([gemini_text, openrouter_text], mode=mode)
+    if chosen:
+        return chosen
+
+    if gemini_text:
+        return _normalize_text(gemini_text)
+    if openrouter_text:
+        return _normalize_text(openrouter_text)
+    raise RuntimeError("No valid candidate returned from Gemini or OpenRouter")
