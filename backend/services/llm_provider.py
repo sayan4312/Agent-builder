@@ -194,7 +194,7 @@ def generate_text_with_fallback(
     contents: str,
     config: Any = None,
     response_format: Optional[Dict[str, Any]] = None,
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct",
+    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free",
 ) -> str:
     """Generate text with Gemini first, then OpenRouter as a fallback."""
     try:
@@ -212,7 +212,7 @@ def generate_text_pro(
     contents: str,
     config: Any = None,
     response_format: Optional[Dict[str, Any]] = None,
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct",
+    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free",
     mode: str = "code",
 ) -> str:
     """Fast, responsive LLM provider trying Gemini 2.0 Flash first, falling back to OpenRouter on failure."""
