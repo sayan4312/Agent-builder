@@ -87,17 +87,19 @@ def _call_openrouter(contents: str, model: Optional[str] = None, response_format
     elapsed = round(time.time() - REQUEST_STATS["start_time"], 2)
     print(f"\n🌐 [OPENROUTER DEBUG REQUEST #{call_num}] (Elapsed: {elapsed}s)")
 
-    models_to_try = [model] if model else [
-        "deepseek/deepseek-r1:free",
+    default_free_models = [
         "qwen/qwen-2.5-coder-32b-instruct:free",
-        "meta-llama/llama-3.2-1b-instruct:free"
+        "meta-llama/llama-3.2-1b-instruct:free",
+        "google/gemini-2.0-flash-lite-preview-02-05:free"
     ]
+    models_to_try = ([model] if model else []) + [m for m in default_free_models if m != model]
 
     last_err = None
     for m in models_to_try:
         if not m:
             continue
         try:
+            print(f"   --> Attempting OpenRouter Model: '{m}'...")
             payload: Dict[str, Any] = {
                 "model": m,
                 "messages": [
@@ -121,11 +123,16 @@ def _call_openrouter(contents: str, model: Optional[str] = None, response_format
             )
             if response.status_code == 200:
                 data = response.json()
-                return data["choices"][0]["message"]["content"].strip()
+                res_text = data["choices"][0]["message"]["content"].strip()
+                print(f"   ✅ [SUCCESS] OpenRouter '{m}' returned {len(res_text)} chars.")
+                return res_text
             else:
-                last_err = RuntimeError(f"OpenRouter HTTP {response.status_code}: {response.text[:100]}")
+                err_msg = f"HTTP {response.status_code}: {response.text[:100]}"
+                print(f"   ❌ [FAILED] OpenRouter '{m}': {err_msg}")
+                last_err = RuntimeError(f"OpenRouter {err_msg}")
         except Exception as exc:
             last_err = exc
+            print(f"   ❌ [FAILED] OpenRouter '{m}': {exc}")
             continue
 
     if last_err:
