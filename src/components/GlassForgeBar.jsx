@@ -5,9 +5,7 @@ import { DEMO_SCENARIOS } from '../data/mockData';
 export default function GlassForgeBar({ prompt, setPrompt, onForge, isBuilding }) {
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (prompt.trim()) {
-      onForge(prompt);
-    }
+    onForge(prompt.trim() || "Custom AI Agent");
   };
 
   const handleChipClick = (scenarioPrompt) => {
@@ -35,7 +33,7 @@ export default function GlassForgeBar({ prompt, setPrompt, onForge, isBuilding }
         <button 
           type="submit" 
           className="forge-submit-btn" 
-          disabled={isBuilding || !prompt.trim()}
+          disabled={isBuilding}
         >
           <span>{isBuilding ? "Building..." : "Build Agent"}</span>
           <ArrowRight size={15} />
