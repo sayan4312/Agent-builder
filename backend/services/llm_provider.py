@@ -30,7 +30,7 @@ def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] 
     if not client:
         raise RuntimeError("Gemini API key not configured")
 
-    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05"]
+    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05", "gemini-1.5-flash", "gemini-1.5-pro"]
     last_err = None
 
     for model_name in model_list:
