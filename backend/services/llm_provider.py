@@ -30,7 +30,7 @@ def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] 
     if not client:
         raise RuntimeError("Gemini API key not configured")
 
-    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]
+    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05"]
     last_err = None
 
     for model_name in model_list:
@@ -43,8 +43,8 @@ def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] 
         except Exception as exc:
             last_err = exc
             err_str = str(exc)
-            if "401" in err_str or "UNAUTHENTICATED" in err_str:
-                print(f"[WARN] Gemini primary call failed: {err_str[:120]}... Trying OpenRouter fallback.")
+            if "401" in err_str or "UNAUTHENTICATED" in err_str or "INVALID_ARGUMENT" in err_str:
+                print(f"[WARN] Gemini primary call failed: {err_str[:120]}... Ensure key starts with 'AIzaSy' from aistudio.google.com")
                 break
             if any(k in err_str for k in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "500", "504", "OVERLOADED"]):
                 print(f"[INFO] Gemini model {model_name} rate-limited/busy ({err_str[:60]}...), trying fallback model...")
