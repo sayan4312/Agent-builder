@@ -28,17 +28,18 @@ export default function AIEngineerPanel({
   const chatEndRef = useRef(null);
   const hasInitializedRef = useRef(false);
 
-  // Initialize chatbot conversation cleanly ONCE on load
+  // Initialize chatbot conversation cleanly ONCE on load with instant greeting
   useEffect(() => {
-    if (messages && messages.length > 0) {
-      hasInitializedRef.current = true;
-      return;
+    if (messages && messages.length === 0) {
+      setMessages([
+        {
+          sender: 'ai',
+          text: `Hello! I am your Senior AI Architect. I'm ready to design your custom agent for "${prompt || 'Custom AI Agent'}". What specific features, APIs, or data sources would you like to integrate?`,
+          time: 'Just now'
+        }
+      ]);
     }
-    if (prompt && !hasInitializedRef.current && messages.length === 0) {
-      hasInitializedRef.current = true;
-      fetchArchitectChat(prompt, []);
-    }
-  }, [prompt, messages]);
+  }, [prompt]);
 
   // Scroll chat to bottom on new message
   useEffect(() => {
