@@ -25,19 +25,10 @@ def _get_openrouter_key():
     return os.getenv("OPENROUTER_API_KEY", "").strip()
 
 
-GEMINI_CALL_COUNT = 0
-
 def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] = None) -> str:
-    global GEMINI_CALL_COUNT
     client = _get_gemini_client()
     if not client:
         raise RuntimeError("Gemini API key not configured")
-
-    GEMINI_CALL_COUNT += 1
-    call_id = GEMINI_CALL_COUNT
-    current_time = time.strftime("%H:%M:%S")
-    prompt_summary = contents[:55].strip().replace("\n", " ")
-    print(f"\n⚡ [GEMINI API REQUEST #{call_id}] at {current_time} | Prompt: '{prompt_summary}...'")
 
     model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
     last_err = None
@@ -48,24 +39,21 @@ def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] 
             if config is not None:
                 kwargs["config"] = config
             response = client.models.generate_content(**kwargs)
-            print(f"   --> Request #{call_id} [{model_name}] -> ✅ 200 SUCCESS")
             return (response.text or "").strip()
         except Exception as exc:
             last_err = exc
             err_str = str(exc)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                print(f"   --> Request #{call_id} [{model_name}] -> ❌ 429 RATE LIMIT EXCEEDED")
+            if "401" in err_str or "UNAUTHENTICATED" in err_str:
+                print(f"[WARN] Gemini primary call failed: {err_str[:120]}... Trying OpenRouter fallback.")
+                break
+            if any(k in err_str for k in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "500", "504", "OVERLOADED"]):
+                print(f"[INFO] Gemini model {model_name} rate-limited/busy, trying fallback model...")
                 time.sleep(1.0)
                 continue
-            elif "401" in err_str or "UNAUTHENTICATED" in err_str or "INVALID_ARGUMENT" in err_str:
-                print(f"   --> Request #{call_id} [{model_name}] -> ❌ 401 INVALID AUTH KEY")
-                break
-            elif "404" in err_str or "NOT_FOUND" in err_str:
-                print(f"   --> Request #{call_id} [{model_name}] -> ❌ 404 MODEL NOT FOUND")
+            if any(k in err_str for k in ["404", "NOT_FOUND"]):
+                print(f"[INFO] Gemini model {model_name} not found, trying fallback...")
                 continue
-            else:
-                print(f"   --> Request #{call_id} [{model_name}] -> ❌ ERROR: {err_str[:100]}")
-                break
+            break
 
     if last_err:
         raise last_err
