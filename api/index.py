@@ -10,5 +10,10 @@ if backend_dir not in sys.path:
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
-from backend.main import app
+from backend.main import app as fastapi_app
+
+# Top-level assignments required by Vercel serverless function parser
+app = fastapi_app
+application = fastapi_app
+handler = fastapi_app
 
