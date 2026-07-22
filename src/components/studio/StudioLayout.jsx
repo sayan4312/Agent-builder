@@ -212,25 +212,96 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
         throw new Error(data?.error || "No codebase files returned from AI backend");
       }
     } catch (e) {
-      console.warn("Backend evolve error, activating fallback template:", e);
+      console.warn("Backend evolve error, activating fallback generator:", e);
       clearTimeout(stageTimer2);
       clearTimeout(stageTimer3);
       clearTimeout(stageTimer3_sub);
       clearTimeout(stageTimer4);
 
-      const fallbackFiles = {
-        "main.py": `import os\nimport sys\nfrom fastapi import FastAPI\nfrom agent_orchestrator import CustomAgentOrchestrator\n\napp = FastAPI(\n    title="${(prompt || 'Custom AI Agent').replace(/"/g, '\\"')}",\n    description="AgentForge Production Workspace",\n    version="1.0.0"\n)\n\nagent = CustomAgentOrchestrator()\n\n@app.get("/")\ndef root():\n    return {"status": "online", "agent": "${(prompt || 'Custom AI Agent').replace(/"/g, '\\"')}"}\n\n@app.post("/execute")\ndef run_agent(task: str):\n    return agent.run(task)\n\nif __name__ == "__main__":\n    import uvicorn\n    uvicorn.run(app, host="0.0.0.0", port=8000)\n`,
-        "agent_orchestrator.py": `class CustomAgentOrchestrator:\n    def __init__(self):\n        self.name = "${(prompt || 'Custom AI Agent').replace(/"/g, '\\"')}"\n\n    def run(self, input_text: str):\n        print(f"[Agent] Processing task: {input_text}")\n        return {\n            "agent": self.name,\n            "task": input_text,\n            "status": "COMPLETED",\n            "result": f"Processed context for {input_text}"\n        }\n`,
-        "tools.py": `def search_web_tool(query: str) -> dict:\n    """Tool: Searches web data sources."""\n    return {"query": query, "output": f"Found relevant context for '{query}'"}\n\ndef calculate_metric_tool(val1: float, val2: float) -> float:\n    """Tool: Calculates custom metrics."""\n    return val1 + val2\n`,
-        "README.md": `# ${(prompt || 'Custom AI Agent')}\n\nBuilt with **AgentForge Studio v2.0**.\n\n## Project Overview\nModular agent project workspace with FastAPI entrypoint and orchestrator.\n\n## Files\n- \`main.py\`: FastAPI application server.\n- \`agent_orchestrator.py\`: Core Agent Execution Loop.\n- \`tools.py\`: Helper tools & integrations.\n`
-      };
-
-      finishGeneration(fallbackFiles);
       setGenerationLogs((prev) => [
         ...prev,
-        { text: `⚠️ AI API rate limit / error (${e.message || 'Error'}). Activated local template codebase fallback.`, status: 'warning' },
-        { text: `✓ [Fallback Complete] Loaded 4 modular production files into workspace.`, status: 'success' }
+        { text: `⚠️ AI Backend limit reached or offline: ${e.message || 'Rate limit / quota exceeded'}`, status: 'warning' },
+        { text: `[Fallback Engine] Generating production template codebase matching your specifications...`, status: 'info' }
       ]);
+
+      const cleanTitle = (prompt || "Custom Agent").replace(/[^a-zA-Z0-9 ]/g, "").trim() || "CustomAgent";
+      const className = cleanTitle.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') || "CustomAgent";
+      const promptEscaped = (prompt || "Custom Agent").replace(/"/g, '\\"');
+
+      const fallbackFiles = {
+        "main.py": `import sys
+import os
+import asyncio
+from agent_orchestrator import ${className}Orchestrator
+
+async def main():
+    print("🚀 Initializing ${cleanTitle}...")
+    agent = ${className}Orchestrator()
+    result = await agent.run("${promptEscaped}")
+    print(f"✅ Execution Result:\\n{result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+`,
+        "agent_orchestrator.py": `import json
+import asyncio
+from tools.mcp_server import FastMCPToolServer
+
+class ${className}Orchestrator:
+    def __init__(self):
+        self.name = "${cleanTitle}"
+        self.mcp_tools = FastMCPToolServer()
+
+    async def run(self, input_prompt: str) -> str:
+        """Processes prompt through multi-agent orchestration pipeline."""
+        tool_output = await self.mcp_tools.execute_tool("process_data", {"query": input_prompt})
+        return f"[${cleanTitle}] Successfully processed workflow for: '{input_prompt}'\\nTool Output: {tool_output}"
+`,
+        "tools/mcp_server.py": `import time
+import json
+import asyncio
+from typing import Dict, Any
+
+class FastMCPToolServer:
+    def __init__(self):
+        self.registered_tools = ["process_data", "fetch_context", "execute_action"]
+
+    async def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> str:
+        if tool_name not in self.registered_tools:
+            return f"Error: Tool '{tool_name}' not registered."
+        await asyncio.sleep(0.1)
+        return json.dumps({
+            "status": "success",
+            "tool": tool_name,
+            "params": params,
+            "timestamp": time.time()
+        })
+`,
+        "requirements.txt": `fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+requests>=2.31.0
+`,
+        "README.md": `# ${cleanTitle}
+
+Custom multi-agent workflow generated by AgentForge.
+
+## Features
+- Modular multi-agent orchestrator architecture
+- FastMCP tool server integration
+- Async execution pipeline
+
+## Usage
+\`\`\`bash
+pip install -r requirements.txt
+python main.py
+\`\`\`
+`
+      };
+
+      setTimeout(() => {
+        finishGeneration(fallbackFiles);
+      }, 1000);
     }
   };
 
