@@ -39,7 +39,7 @@ def _call_gemini(contents: str, config: Any = None, models: Optional[List[str]] 
     prompt_summary = contents[:55].strip().replace("\n", " ")
     print(f"\n⚡ [GEMINI API REQUEST #{call_id}] at {current_time} | Prompt: '{prompt_summary}...'")
 
-    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-8b"]
+    model_list = models or ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
     last_err = None
 
     for model_name in model_list:
@@ -79,8 +79,7 @@ def _call_openrouter(contents: str, model: Optional[str] = None, response_format
 
     default_free_models = [
         "qwen/qwen-2.5-coder-32b-instruct:free",
-        "meta-llama/llama-3.2-1b-instruct:free",
-        "google/gemini-2.0-flash-lite-preview-02-05:free"
+        "meta-llama/llama-3.2-1b-instruct:free"
     ]
     models_to_try = ([model] if model else []) + [m for m in default_free_models if m != model]
 
