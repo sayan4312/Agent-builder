@@ -7,6 +7,7 @@ import LivePreviewPanel from './LivePreviewPanel';
 import CodeEditorPanel from './CodeEditorPanel';
 import BottomConsoleDock from './BottomConsoleDock';
 import PipelineExecutionView from './PipelineExecutionView';
+import { API_BASE_URL } from '../../config';
 
 export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent, onBackToHome }) {
   const [questionnaireData, setQuestionnaireData] = useState(null);
@@ -83,7 +84,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
 
   const fetchQuestionnaire = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/architect/interview', {
+      const res = await fetch(`${API_BASE_URL}/api/architect/interview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt || "Custom AI Agent" })
@@ -180,7 +181,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
     }, 20000);
 
     try {
-      const res = await fetch('http://localhost:8000/api/evolve', {
+      const res = await fetch(`${API_BASE_URL}/api/evolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files: {}, user_request: intentPrompt })
@@ -286,7 +287,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
       { text: `Executing agent process...`, status: 'info' }
     ]);
 
-    fetch('http://localhost:8000/api/run', {
+    fetch(`${API_BASE_URL}/api/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -305,7 +306,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
         ]);
       })
       .catch((err) => {
-        const fallbackMsg = `[OFFLINE MODE] Could not reach backend server at http://localhost:8000.\nStart the backend with: python -m uvicorn main:app --host 0.0.0.0 --port 8000`;
+        const fallbackMsg = `[OFFLINE MODE] Could not reach backend server at ${API_BASE_URL || 'http://localhost:8000'}.\nStart the backend with: python -m uvicorn main:app --host 0.0.0.0 --port 8000`;
         setExecutionOutput(fallbackMsg);
         setGenerationLogs((prev) => [
           ...prev,
@@ -315,7 +316,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
   };
 
   const handleDownloadZip = () => {
-    fetch('http://localhost:8000/api/download', {
+    fetch(`${API_BASE_URL}/api/download`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ files })
@@ -338,7 +339,7 @@ export default function StudioLayout({ prompt, initialFiles = null, onSaveAgent,
     ]);
 
     try {
-      const res = await fetch('http://localhost:8000/api/evolve', {
+      const res = await fetch(`${API_BASE_URL}/api/evolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files, user_request: userReq })

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, Sparkles, ArrowRight, Loader2, User } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
 export default function AIEngineerPanel({
   prompt,
@@ -50,7 +51,7 @@ export default function AIEngineerPanel({
     setMessages(newHistory);
 
     try {
-      const res = await fetch('http://localhost:8000/api/architect/chat', {
+      const res = await fetch(`${API_BASE_URL}/api/architect/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
