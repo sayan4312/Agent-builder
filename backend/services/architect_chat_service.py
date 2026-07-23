@@ -57,7 +57,7 @@ Return strictly valid JSON in the following format:
             config=types.GenerateContentConfig(response_mime_type="application/json"),
             mode="json"
         )
-        data = json.loads(raw_json)
+        data = json.loads(raw_json, strict=False)
         return {
             "success": True,
             "reply": data.get("reply", "I have recorded these system requirements into the architectural specification. What specific third-party APIs or data persistence models should we integrate?"),

@@ -68,8 +68,8 @@ def _call_openrouter(contents: str, model: Optional[str] = None, response_format
     default_openrouter_models = [
         "openai/gpt-4o-mini",
         "deepseek/deepseek-chat",
-        "anthropic/claude-3.5-haiku",
         "meta-llama/llama-3.3-70b-instruct",
+        "anthropic/claude-3-haiku",
         "deepseek/deepseek-r1",
         "qwen/qwen-2.5-coder-32b-instruct:free",
         "meta-llama/llama-3.2-1b-instruct:free",
@@ -87,7 +87,7 @@ def _call_openrouter(contents: str, model: Optional[str] = None, response_format
                     {"role": "user", "content": contents}
                 ],
                 "temperature": 0.2,
-                "max_tokens": 2048,
+                "max_tokens": 1024,
             }
             if response_format:
                 payload["response_format"] = response_format
